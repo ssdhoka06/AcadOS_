@@ -1,0 +1,481 @@
+AcadOS
+Project Roadmap & Team Execution Plan
+5-Person Team  |  Python + C  |  OS Simulation  |  College Project
+Sachi  •  Ragini  •  Nikhil  •  Shakti  •  Sanat
+Operating Systems Course  |  Dept. CSE (AI & ML)  |  A.Y. 2025–26
+1.  Project Overview
+AcadOS is a simulated operating system for a university's shared compute server. It understands academic context — who submitted a job, what type it is, and when it's due — and makes smarter CPU, memory, and I/O decisions based on that knowledge.
+This document is the complete task-by-task execution plan. Each person owns one module. Every module has defined inputs and outputs so all five pieces connect seamlessly at the end.
+CRITICAL RULE: Every person exposes their module through the interfaces defined in Section 3. Do not change function names or signatures after Day 1 morning. Shakti's shared.py is the contract everyone builds against.
+2.  Tech Stack
+Layer
+Technology
+Owner
+Shared Foundation
+Python 3.11 dataclasses + enums + ctypes
+Shakti
+PCB Struct (C)
+C17 — GCC 13, compiled to .so shared library
+Shakti
+CPU Scheduler
+Python — PriorityQueue, deque, matplotlib Gantt
+Sachi
+Memory Manager
+Python — page table dict, TLB simulation, matplotlib
+Ragini
+Deadlock & Sync
+C (Banker's Algorithm) + Python threading.Lock, sqlite3
+Nikhil
+I/O & Anti-Abuse
+Python — threading.Thread, sqlite3, matplotlib
+Sanat
+Build System
+Makefile — compiles C, runs pytest, starts simulator
+All
+Version Control
+Git + GitHub — one branch per person
+All
+Testing
+pytest — one test file per module
+All
+Output Graphs
+matplotlib — Gantt chart, page fault graph, disk seek graph
+Sachi, Ragini, Sanat
+Terminal UI
+rich — live colour-coded process table during simulation
+Sanat
+Integration Entry
+main.py — imports all modules, runs full demo scenario
+All (Day 2)
+3.  Team Roles & Responsibilities
+Person
+Role
+Primary Focus
+Files They Own
+Shakti
+Foundation Engineer
+PCB struct, state machine, urgency score, shared.py
+shared.py, c_src/pcb.c
+Sachi
+Scheduler Engineer
+Three-tier CPU scheduler, EDF, Round Robin, Gantt chart
+scheduler.py, tests/test_scheduler.py
+Ragini
+Memory Engineer
+Paging, TLB, deadline-aware page replacement, page fault graph
+memory.py, tests/test_memory.py
+Nikhil
+Deadlock Engineer
+Banker's Algorithm, semaphores, Readers-Writers, role-aware recovery
+deadlock.py, c_src/banker.c, tests/test_deadlock.py
+Sanat
+I/O & Systems Engineer
+Disk scheduling, anti-abuse daemon, sqlite3 logging, disk seek graph
+io_manager.py, tests/test_io.py
+4.  Module Contracts (Agree Before Writing Any Code)
+All five people must read and agree on these interfaces before writing any logic. This prevents integration failure when all modules are connected in main.py.
+4.1  shared.py — Shakti exposes
+Function / Class
+Input
+Output
+PCB (dataclass)
+All fields as constructor args
+PCB object with all academic fields
+pcb.compute_urgency()
+None (reads self)
+Updates self.urgency_score in place
+transition_state(pcb, new_state)
+PCB object + State enum value
+Updated PCB or raises ValueError on illegal transition
+Role, JobType, State
+—
+Enums imported by all other modules
+4.2  scheduler.py — Sachi exposes
+Function
+Input
+Output
+submit_job(pcb)
+PCB object
+None — places job in correct tier queue
+scheduler_tick(tick_number)
+Integer tick count
+(running_pcb, preempted_pcb | None)
+plot_gantt(timeline_list)
+List of (pid, job_type, tick) tuples
+Saves outputs/gantt.png
+4.3  memory.py — Ragini exposes
+Function
+Input
+Output
+allocate_pages(pcb, num_pages)
+PCB object + integer
+True or raises MemoryError
+access_page(pcb, virtual_page)
+PCB object + page number
+frame_number (handles TLB + fault internally)
+free_pages(pcb)
+PCB object
+None — releases all frames on process exit
+plot_page_faults(acados_list, lru_list)
+Two lists of fault counts per job type
+Saves outputs/page_faults.png
+4.4  deadlock.py — Nikhil exposes
+Function
+Input
+Output
+request_resources(pcb, request_dict)
+PCB + dict {'CPU':n, 'MEM_BLOCK':n}
+True (allocated) or False (unsafe — queued)
+release_resources(pcb)
+PCB object
+None — frees all held resources on exit
+deadlock_recover(all_pcbs)
+List of all active PCB objects
+List of terminated PIDs
+db_read(pid)
+Integer PID
+Row data from accounting DB
+db_write(pid, data)
+Integer PID + dict of data
+None — writes to sqlite3
+4.5  io_manager.py — Sanat exposes
+Function / Class
+Input
+Output
+cscan(requests, head)
+List of cylinder numbers + head position
+Ordered list of cylinder numbers (service order)
+sstf(requests, head)
+List of cylinder numbers + head position
+Ordered list of cylinder numbers (service order)
+log_job(pcb)
+PCB object (with cpu_used filled)
+None — writes row to acados.db
+AbuseMonitor(process_table, tick_interval)
+List of active PCBs + integer
+Thread object — call .start() and .stop()
+plot_disk_seeks(cscan_order, sstf_order)
+Two ordered lists of cylinder numbers
+Saves outputs/disk_seeks.png
+5.  Task-by-Task Execution Plan
+Tasks are ordered by dependency — earlier tasks must be completed before later ones can start. Tasks within the same number (e.g. Task 2) can run in parallel.
+Task 1 is Shakti alone. Everyone else starts Task 2 only after shared.py is pushed to GitHub.
+TASK 1  —  FOUNDATION  |  shared.py + PCB Struct  |  Must finish before anyone else starts
+Shakti  —  Foundation Engineer
+📋 TASK 1  —  shared.py + PCB in C + State Machine
+• ⚙️  Set up GitHub repo — create folders: acados/, c_src/, tests/, outputs/. Invite all 4 teammates.
+• 📦  Create shared.py — define PCB dataclass with all fields: pid, user_id, role, job_type, deadline, cpu_budget_ns, urgency_score, abuse_flag, state, cpu_used, pages, resources_held, disk_requests.
+• 🏷️  Define all enums — Role (STUDENT=1, RESEARCHER=2, FACULTY=3), JobType (PRACTICE=1, RESEARCH=2, EXAM=3, EVALUATION=4), State (NEW through THROTTLED = 8 states).
+• 🧮  Write compute_urgency() method on PCB — formula: urgency = (role_weight × jobtype_weight) / max(0.01, deadline - time.time()). Role weights: S=1, R=2, F=3. JobType weights: PRACTICE=1, RESEARCH=2, EXAM=4, EVAL=5.
+• 🔄  Write transition_state(pcb, new_state) — validates legal transitions (e.g. RUNNING→BLOCKED is valid, RUNNING→NEW is not). Raise ValueError on illegal transition.
+• 🔧  Write pcb.c — C struct mirroring the Python PCB. Compile: gcc -shared -fPIC -o c_src/pcb.so c_src/pcb.c
+• 🐍  Write ctypes bridge in shared.py — load_pcb_from_c() loads the .so and maps C struct fields to Python PCB object.
+• ✍️  Write Makefile — 'make' compiles both .c files. 'make test' runs pytest. 'make clean' removes .so files.
+• 📤  Push shared.py to main branch and message the group — everyone can now start their module.
+✅  shared.py imported successfully by all 4 teammates with no errors. All enums, PCB fields, and transition_state() confirmed working.
+TASK 2  —  CORE MODULES  |  All 4 People Build in Parallel  |  Use dummy PCBs from shared.py
+Everyone starts Task 2 at the same time after shared.py is pushed. Use dummy PCB objects to test your module — do not wait for other people's modules.
+Sachi  —  Scheduler Engineer
+📋 TASK 2  —  Three-Tier CPU Scheduler
+• ⚙️  Install: pip install matplotlib. Create scheduler.py, import PCB, Role, JobType, State from shared.
+• 📋  Build three queues — Tier1: PriorityQueue sorted by urgency_score descending (negate for max-heap). Tier2: PriorityQueue with aging counter. Tier3: collections.deque for Round Robin.
+• 📥  Write submit_job(pcb) — call pcb.compute_urgency(), check job_type, place in correct tier queue. EXAM/EVALUATION → Tier1. RESEARCH → Tier2. PRACTICE → Tier3.
+• ⏱️  Write scheduler_tick(tick_number) — check Tier1 first (EDF: pop lowest deadline). If Tier1 empty, check Tier2. If both empty, pop from Tier3 deque. Return (running_pcb, preempted_pcb or None). Call transition_state() on both.
+• 🔄  Implement context switch — save_context(pcb): store {'PC': tick, 'REG': tick*2} into a dict on the PCB. load_context(pcb): restore the dict. Call both inside scheduler_tick().
+• 📈  Implement aging for Tier2 — every 5 ticks, add 0.1 to urgency_score of all waiting Tier2 jobs so they eventually get scheduled.
+• 🧪  Test with dummy data — create 3 EXAM + 3 PRACTICE + 2 RESEARCH PCBs. Run 30 ticks. Print which PID runs each tick. Confirm EXAM always gets CPU first.
+• 📊  Write plot_gantt(timeline_list) — takes [(pid, job_type_str, tick)] list. Plot coloured horizontal bars per PID. EXAM=red, RESEARCH=orange, PRACTICE=green. Save to outputs/gantt.png.
+✅  Scheduler runs 30+ ticks with mixed jobs. Gantt chart saved to outputs/gantt.png showing EXAM jobs dominating CPU time.
+Ragini  —  Memory Engineer
+📋 TASK 2  —  Paging + Deadline-Aware Page Replacement
+• ⚙️  Create memory.py, import PCB, Role, JobType, State from shared.
+• 🏗️  Write MemoryManager class — total_frames=32 (simulated RAM). free_frames = list(range(32)). page_table = {} (dict: pid → {virtual_page: frame}). lru_tracker = {} (dict: (pid, vpage) → last_access_tick). swap_space = {} (dict: (pid, vpage) → 'data').
+• 📄  Write allocate_pages(pcb, num_pages) — pop num_pages frames from free_frames, build page_table[pcb.pid] mapping. If not enough frames, call _deadline_replace() first.
+• 🔍  Write TLB — self.tlb = {} with max size 8. On access_page(pcb, vpage): check TLB first (hit → return frame). Miss → check page_table. Not in page_table → call _page_fault_handler().
+• ⚡  Write _deadline_replace() — victim selection: collect all pages from PRACTICE PCBs first, then RESEARCH, then EXAM. Within same job_type, pick the page with the oldest lru_tracker entry (LRU). Evict it to swap_space. Update page_table and TLB.
+• 🔁  Write _page_fault_handler(pcb, vpage) — load page from swap_space back into a free frame. Update page_table[pcb.pid][vpage] and TLB. Increment a fault counter per job_type.
+• 🆓  Write free_pages(pcb) — remove all entries for pcb.pid from page_table and TLB. Add frames back to free_frames.
+• 🧪  Test — fill all 32 frames with 4 PRACTICE + 1 EXAM PCB. Access EXAM page. Confirm only PRACTICE pages evicted. Check page_table entries are correct.
+• 📊  Write plot_page_faults(acados_faults, lru_faults) — grouped bar chart: x-axis = job types, y-axis = fault count, two bars per group (AcadOS vs LRU). Save to outputs/page_faults.png.
+✅  Deadline-aware replacement confirmed: EXAM pages stay in RAM even when memory is full. Page fault comparison graph saved to outputs/page_faults.png.
+Nikhil  —  Deadlock Engineer
+📋 TASK 2  —  Banker's Algorithm + Synchronization
+• ⚙️  Create deadlock.py, import PCB, Role, JobType from shared. Also create c_src/banker.c.
+• 🏗️  Write ResourceManager class — available = {'CPU': 4, 'MEM_BLOCK': 8}. allocation = {} (pid → resources dict). max_need = {} (pid → max resources dict). Register a process with register(pcb, max_dict).
+• 🔧  Write banker.c — function is_safe_state(available[], allocation[][], need[][], n_processes, n_resources) → returns 1 if safe, 0 if not. Implements standard Banker's safety algorithm. Compile: gcc -shared -fPIC -o c_src/banker.so c_src/banker.c
+• 📡  Write request_resources(pcb, request_dict) — compute need = max_need[pid] - allocation[pid]. Call is_safe_state via ctypes with hypothetical new allocation. If safe: update allocation + available and return True. If not: return False (job waits).
+• 🆓  Write release_resources(pcb) — add pcb's allocation back to available. Remove from allocation dict.
+• 🧪  Test Banker's — set up 3 processes that would deadlock if all granted. Confirm request_resources returns False for the unsafe one.
+• ⚠️  Write deadlock_recover(all_pcbs) — sort processes by job_type (PRACTICE first, EXAM last). Terminate first process: call release_resources, set state to EXIT. Repeat until safe state restored. Return list of terminated PIDs.
+• 🔒  Write AcadosSemaphore class — readers_count=0, mutex=threading.Lock(), write_lock=threading.Lock(). db_read(pid): acquire reader lock (allow multiple readers). db_write(pid, data): acquire write_lock exclusively. This implements Readers-Writers.
+• 🧪  Test sync — spawn 5 reader threads + 1 writer thread simultaneously. Confirm no race conditions and data stays consistent.
+✅  Banker's Algorithm rejects unsafe resource requests. Deadlock recovery terminates PRACTICE first, never EXAM. Readers-Writers semaphore tested with concurrent threads.
+Sanat  —  I/O & Systems Engineer
+📋 TASK 2  —  Disk Scheduling + Anti-Abuse Daemon
+• ⚙️  Install: pip install rich matplotlib. Create io_manager.py, import PCB, Role, JobType, State from shared. Also import transition_state from shared.
+• 💿  Write DiskScheduler class — current_head=0. Write cscan(requests, head): implement C-SCAN algorithm (scan in one direction, jump to start, scan again). Write sstf(requests, head): implement SSTF (pick closest cylinder to current head each time).
+• 🧪  Test disk schedulers — use requests=[95, 180, 34, 119, 11, 123, 62, 64, 66], head=50. Print service order for both. Verify C-SCAN and SSTF give different orderings.
+• 📊  Write plot_disk_seeks(cscan_order, sstf_order) — line chart: x-axis = service sequence, y-axis = cylinder number. Two lines (C-SCAN in blue, SSTF in orange). Save to outputs/disk_seeks.png.
+• 🗄️  Write sqlite3 setup — create_db() creates acados.db with table: job_log(pid, user_id, role, job_type, cpu_used, start_time, end_time, missed_deadline). Write log_job(pcb): insert a row using pcb fields.
+• 🔔  Write FileSystem class — QUOTAS = {Role.STUDENT: 10, Role.RESEARCHER: 100, Role.FACULTY: 500}. create_job_dir(pcb) adds entry to a dict. check_quota(pcb, usage_gb) raises QuotaError if over limit.
+• 🚨  Write AbuseMonitor(process_table, tick_interval=5) as threading.Thread subclass — in run(): loop every tick_interval seconds. For each pcb in process_table: if pcb.cpu_used > 2 * pcb.cpu_budget_ns: set pcb.abuse_flag=True, halve pcb.cpu_budget_ns, call transition_state(pcb, State.THROTTLED) from shared.
+• 🖥️  Wire up rich display — use rich.table.Table to print a live process table every 10 ticks: columns = PID, Role, JobType, State, CPU Used, Abuse Flag. Colour THROTTLED rows in red.
+• 🧪  Test daemon — create a PCB with cpu_used = 3x cpu_budget_ns. Start AbuseMonitor. After 5 ticks confirm pcb.state == State.THROTTLED and pcb.abuse_flag == True.
+✅  C-SCAN and SSTF produce correct orderings. Disk seek graph saved. AbuseMonitor correctly throttles abusive processes. sqlite3 DB logs jobs. rich table displays live process state.
+TASK 3  —  UNIT TESTS  |  Everyone writes pytest tests for their own module  |  Run before integration
+Before connecting anything to main.py, every person must run pytest on their own module and get all tests passing. This is the gate to Task 4.
+Person
+Test File
+Minimum Tests Required
+Shakti
+tests/test_shared.py
+PCB creation, compute_urgency() gives higher score to EXAM than PRACTICE, all legal state transitions pass, all illegal transitions raise ValueError
+Sachi
+tests/test_scheduler.py
+EXAM job always preempts PRACTICE, Tier2 aging increments score every 5 ticks, context switch saves and restores PCB state, plot_gantt() creates the file
+Ragini
+tests/test_memory.py
+TLB hit on second access, page fault fires when page not in table, EXAM pages never evicted when PRACTICE pages exist, free_pages() returns frames to free list
+Nikhil
+tests/test_deadlock.py
+Banker's returns False for known unsafe request, safe request returns True, recovery terminates PRACTICE before RESEARCH before EXAM, 5 concurrent reader threads + 1 writer cause no corruption
+Sanat
+tests/test_io.py
+C-SCAN returns correct order for known input, SSTF returns correct order, log_job() inserts row in DB, AbuseMonitor sets THROTTLED state after 5 ticks on abusive process
+Run: pytest tests/ -v     from the repo root. All tests must pass before anyone moves to Task 4.
+TASK 4  —  INTEGRATION  |  Connect all modules in main.py  |  Everyone participates
+This task is done together. One person shares screen. Add modules one at a time in dependency order — do not try to connect everything at once.
+Integration Step
+What to Add
+Who Leads
+Test After Each Step
+Step 1
+Import shared.py. Create 5 dummy PCBs of mixed types. Print all urgency scores.
+Shakti
+Urgency scores print correctly. EXAM > RESEARCH > PRACTICE confirmed.
+Step 2
+Import scheduler.py. Submit all 5 PCBs. Run 20 ticks. Print which PID runs each tick.
+Sachi
+EXAM PIDs dominate the first ticks. No crash.
+Step 3
+Import memory.py. Call allocate_pages() for each PCB before submitting. Call access_page() inside the tick loop.
+Ragini
+No MemoryError. Page faults print when expected. No crash.
+Step 4
+Import deadlock.py. Call request_resources() for each PCB at submission. Call release_resources() on exit.
+Nikhil
+Banker's Algorithm runs. One unsafe request gets queued. No crash.
+Step 5
+Import io_manager.py. Start AbuseMonitor thread before the tick loop. Call log_job() for each exiting process.
+Sanat
+Daemon runs in background. Jobs log to DB. Rich table updates live.
+Step 6
+Run the full 50-tick simulation. Generate all 3 graphs. Query the sqlite3 DB and print the job log.
+All
+All 3 graph files exist in outputs/. DB has 5 rows. No errors.
+main.py — Integration Script
+# main.py — run with: python main.py
+import os, time
+import os; os.makedirs('outputs', exist_ok=True)
+from shared import PCB, Role, JobType, State, transition_state
+from scheduler import submit_job, scheduler_tick, plot_gantt
+from memory import allocate_pages, access_page, free_pages, plot_page_faults
+from deadlock import request_resources, release_resources, deadlock_recover, create_db
+from io_manager import log_job, AbuseMonitor, plot_disk_seeks, cscan, sstf
+create_db()   # initialise sqlite3
+# Create jobs
+jobs = [
+  PCB(pid=1, user_id=101, role=Role.STUDENT,    job_type=JobType.EXAM,     deadline=time.time()+300),
+  PCB(pid=2, user_id=102, role=Role.STUDENT,    job_type=JobType.PRACTICE, deadline=time.time()+3600),
+  PCB(pid=3, user_id=201, role=Role.RESEARCHER, job_type=JobType.RESEARCH,  deadline=time.time()+1800),
+  PCB(pid=4, user_id=103, role=Role.STUDENT,    job_type=JobType.PRACTICE, deadline=time.time()+7200),
+  PCB(pid=5, user_id=301, role=Role.FACULTY,    job_type=JobType.EVALUATION,deadline=time.time()+600),
+]
+# Allocate + request + submit
+for job in jobs:
+    allocate_pages(job, num_pages=4)
+    request_resources(job, {'CPU': 1, 'MEM_BLOCK': 2})
+    submit_job(job)
+# Start abuse monitor as background thread
+monitor = AbuseMonitor(process_table=jobs, tick_interval=5)
+monitor.start()
+# Run 50 ticks
+timeline = []
+for tick in range(50):
+    running, preempted = scheduler_tick(tick)
+    if running:
+        access_page(running, virtual_page=tick % 4)
+        running.cpu_used += 1
+    timeline.append((running.pid if running else -1, tick))
+# Cleanup + log + graphs
+monitor.stop()
+for job in jobs:
+    release_resources(job)
+    free_pages(job)
+    log_job(job)
+plot_gantt(timeline)
+plot_disk_seeks(cscan([95,180,34,119,11,123,62,64,66], 50),
+               sstf([95,180,34,119,11,123,62,64,66], 50))
+TASK 5  —  DEMO SCENARIO  |  Run this exact scenario for the final submission
+This is the step-by-step demo script. Run it exactly in this order. Every step proves one OS concept from the syllabus.
+#
+What to Run
+What to Show
+Concept Proved
+1
+Submit 2 PRACTICE + 1 EXAM simultaneously. Run 20 ticks.
+Gantt chart — EXAM gets CPU on tick 1, PRACTICE only runs when EXAM is done.
+EDF Preemptive Scheduling (Unit III)
+2
+Fill all 32 memory frames with PRACTICE jobs. Submit an EXAM job.
+Print page_table before and after — PRACTICE pages evicted, EXAM pages stay.
+Deadline-Aware Page Replacement (Unit V)
+3
+Set one PRACTICE PCB's cpu_used = 3x its cpu_budget_ns. Wait 5 ticks.
+Rich table shows that PCB's state change to THROTTLED in red.
+8-State Model + Anti-Abuse (Unit II)
+4
+Configure jobs so a RESEARCH + PRACTICE request would make system unsafe.
+Print Banker's output: 'UNSAFE — request queued'. Grant a safe request instead.
+Deadlock Avoidance (Unit IV)
+5
+Force deadlock (bypass Banker's for demo). Call deadlock_recover().
+Print terminated PIDs — only PRACTICE gets killed. EXAM untouched.
+Role-Aware Deadlock Recovery (Unit IV)
+6
+Run cscan and sstf on the same disk request list. Plot the graph.
+Show disk seek graph — C-SCAN uniform movement, SSTF greedy movement.
+Disk Scheduling (Unit VI)
+7
+query acados.db after all jobs complete.
+Print job_log table — 5 rows, all fields filled, CPU usage logged.
+I/O & File Management (Unit VI)
+6.  Team Sync Structure
+Time
+What to Share
+Duration
+Start of work (morning)
+What I'm building today + any blockers from last session
+15 min
+End of work (evening)
+What I finished + anything that blocks the next person
+15 min
+Anytime
+If you're stuck for more than 1 hour — message the group immediately, don't wait
+As needed
+Blocker Protocol
+Blocked under 1 hour — try to solve it yourself
+Blocked over 1 hour — message the WhatsApp/Discord group immediately
+Interface dispute — Shakti has final say on shared.py contracts
+Integration bug that's not your module — tag the owner, they fix within 30 minutes
+7.  Risk Register
+Risk
+Likelihood
+Impact
+Mitigation
+shared.py edited after 11 AM Day 1
+Medium
+High
+Shakti freezes the file after push. Any change needs full team agreement. Use git blame to trace regressions.
+C shared library (.so) not loading
+Medium
+High
+Nikhil and Shakti test ctypes load immediately after compiling. If ctypes fails, rewrite Banker's in pure Python as fallback.
+Module works alone but crashes in main.py
+High
+Medium
+Each function must not have global state. Pass all data as arguments, not module-level variables.
+Scheduler doesn't preempt correctly
+Medium
+High
+Urgency score must be recomputed every tick inside scheduler_tick(). Sachi adds this as a test case.
+Page replacement evicts wrong process
+Medium
+High
+Ragini stores PCB references in the memory manager, not just PIDs. Look up job_type directly from PCB, not from a separate dict.
+Threading race condition in AbuseMonitor
+Medium
+Medium
+Sanat wraps process_table access in a threading.Lock(). Never modify the list while iterating.
+matplotlib graph not saving
+Low
+Low
+Add os.makedirs('outputs', exist_ok=True) at top of main.py. Each plot function explicitly calls plt.savefig() then plt.close().
+8.  Final Deliverables Checklist
+#
+Deliverable
+Owner
+Done?
+1
+shared.py with PCB, all enums, compute_urgency(), transition_state()
+Shakti
+☐
+2
+c_src/pcb.c compiled to pcb.so with no errors
+Shakti
+☐
+3
+Three-tier scheduler — EDF preempts Round Robin on every tick
+Sachi
+☐
+4
+outputs/gantt.png — colour-coded Gantt chart across 50 ticks
+Sachi
+☐
+5
+Deadline-aware page replacement — EXAM pages never evicted
+Ragini
+☐
+6
+outputs/page_faults.png — AcadOS vs LRU comparison graph
+Ragini
+☐
+7
+c_src/banker.so — Banker's Algorithm compiled from C
+Nikhil
+☐
+8
+request_resources() returns False for unsafe state
+Nikhil
+☐
+9
+deadlock_recover() kills PRACTICE first, EXAM never
+Nikhil
+☐
+10
+Readers-Writers semaphore tested with 5 concurrent threads
+Nikhil
+☐
+11
+C-SCAN and SSTF produce correct service orders
+Sanat
+☐
+12
+outputs/disk_seeks.png — disk head movement comparison graph
+Sanat
+☐
+13
+AbuseMonitor sets THROTTLED state after CPU abuse detected
+Sanat
+☐
+14
+sqlite3 acados.db — job_log table with 5+ rows after simulation
+Sanat
+☐
+15
+All pytest tests pass — pytest tests/ -v shows green
+All
+☐
+16
+main.py runs from scratch with no errors on a clean environment
+All
+☐
+17
+All 3 output graphs saved in outputs/
+All
+☐
+18
+7-step demo scenario runs successfully end to end
+All
+☐
+Build fast. Ship it. Good luck.  🚀
