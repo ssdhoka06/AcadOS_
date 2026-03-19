@@ -1,0 +1,30 @@
+# Requirements
+requirements.txt
+
+# Virtual Environment
+.venv/
+venv/
+ENV/
+
+# Python Cache
+__pycache__/
+*.pyc
+
+# Pytest
+.pytest_cache/
+
+# Testing/Coverage
+.coverage
+htmlcov/
+
+# C Compilation
+*.so
+*.o
+*.out
+
+# Mac
+.DS_Store
+
+# Editor
+.vscode/
+.idea/
