@@ -505,7 +505,7 @@ export default function AcadOSDashboard() {
           <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>
             AcadOS <span style={{ color: C.accent, fontSize: 14, fontWeight: 400 }}>v0.2</span>
           </h1>
-          <p style={{ margin: 0, fontSize: 11, color: C.textMuted }}>Academic OS Simulator — aligned with Shakti's shared.py</p>
+          <p style={{ margin: 0, fontSize: 11, color: C.textMuted }}>Academic OS Simulator </p>
         </div>
         <div style={{ flex: 1 }} />
         <div style={{ display: "flex", gap: 20, fontSize: 11 }}>
@@ -534,10 +534,10 @@ export default function AcadOSDashboard() {
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginTop: 16 }}>
         <Panel title="CPU Gantt Chart" icon={"\uD83D\uDCCA"} span={2}><GanttChart timeline={timeline} /></Panel>
         <Panel title="Process Table" icon={"\uD83D\uDDA5\uFE0F"} span={2}><ProcessTable jobs={jobs} /></Panel>
-        <Panel title="Memory Manager (Ragini)" icon={"\uD83E\uDDE0"}><MemoryPanel status={memStatus} /></Panel>
-        <Panel title="Banker's Algorithm (Nikhil)" icon={"\uD83D\uDD12"}><DeadlockPanel status={dlStatus} /></Panel>
-        <Panel title="Disk Scheduling (Sanat)" icon={"\uD83D\uDCBF"}><DiskSeeksPanel data={diskData} /></Panel>
-        <Panel title="Job Logs (acados.db)" icon={"\uD83D\uDDC4\uFE0F"}><DbLogsPanel logs={dbLogs} /></Panel>
+        <Panel title="Memory Manager " icon={"\uD83E\uDDE0"}><MemoryPanel status={memStatus} /></Panel>
+        <Panel title="Banker's Algorithm " icon={"\uD83D\uDD12"}><DeadlockPanel status={dlStatus} /></Panel>
+        <Panel title="Disk Scheduling " icon={"\uD83D\uDCBF"}><DiskSeeksPanel data={diskData} /></Panel>
+        <Panel title="Job Logs " icon={"\uD83D\uDDC4\uFE0F"}><DbLogsPanel logs={dbLogs} /></Panel>
         <Panel title="Terminal Output" icon={"\u2328\uFE0F"} span={2}><TerminalPanel lines={termLines} /></Panel>
       </div>
 
